@@ -9,7 +9,8 @@ class WorkflowRunner {
     }
 
     async init() {
-        this.browser = await chromium.launch({ headless: false }); // Headful for demo/debugging
+        const headless = process.env.HEADLESS === 'true';
+        this.browser = await chromium.launch({ headless });
         this.context = await this.browser.newContext();
         this.page = await this.context.newPage();
     }
@@ -21,8 +22,10 @@ class WorkflowRunner {
     async run(workflow, paymentData) {
         const logs = [];
         const log = (msg) => {
-            console.log(`[Runner] ${msg}`);
-            logs.push({ timestamp: new Date(), message: msg });
+            // Redact sensitive data
+            const safeMsg = msg.replace(/\b\d{4}-\d{4}-\d{4}-\d{4}\b/g, '****-****-****-****');
+            console.log(`[Runner] ${safeMsg}`);
+            logs.push({ timestamp: new Date(), message: safeMsg });
         };
 
         try {

@@ -3,6 +3,9 @@ const express = require('express');
 const cors = require('cors');
 const { Pool } = require('pg');
 
+const fs = require('fs');
+const path = require('path');
+
 const app = express();
 app.use(cors());
 app.use(express.json());
@@ -11,16 +14,46 @@ const pool = new Pool({
     connectionString: process.env.DATABASE_URL,
 });
 
-// Mock DB for now if no connection
-const workflows = [];
+// Persistence Setup
+const DB_FILE = path.join(__dirname, 'db.json');
+
+function loadWorkflows() {
+    try {
+        if (fs.existsSync(DB_FILE)) {
+            return JSON.parse(fs.readFileSync(DB_FILE, 'utf8'));
+        }
+    } catch (err) {
+        console.error('Failed to load DB:', err);
+    }
+    return [];
+}
+
+function saveWorkflows(data) {
+    try {
+        fs.writeFileSync(DB_FILE, JSON.stringify(data, null, 2));
+    } catch (err) {
+        console.error('Failed to save DB:', err);
+    }
+}
+
+// Load on startup
+const workflows = loadWorkflows();
 
 app.get('/health', (req, res) => res.json({ status: 'ok' }));
 
 // Create/Update Workflow
 app.post('/workflow', async (req, res) => {
     const { vendor_code, version, workflow_json } = req.body;
-    // TODO: Save to DB
-    workflows.push({ vendor_code, version, workflow_json });
+
+    // Check if exists and update, or push new
+    const existingIndex = workflows.findIndex(w => w.vendor_code === vendor_code);
+    if (existingIndex >= 0) {
+        workflows[existingIndex] = { vendor_code, version, workflow_json };
+    } else {
+        workflows.push({ vendor_code, version, workflow_json });
+    }
+
+    saveWorkflows(workflows);
     console.log(`Saved workflow for ${vendor_code} v${version}`);
     res.json({ success: true, id: 'mock-id' });
 });
